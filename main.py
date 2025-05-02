@@ -9,8 +9,6 @@ import joblib
 import numpy as np
 import shutil
 from upload import extract_health_data_from_pdf, predict_from_extracted_fields
-import uvicorn
-import asyncio
 
 # Load models and encoders
 model = joblib.load("model_xgboost.joblib")
@@ -223,7 +221,7 @@ async def upload_report(file: UploadFile = File(...)):
             "username": extracted.get("username", "Anonymous"),
             "source": "pdf",
             "data": extracted,
-            "result": result["result"],  # Make sure this key exists in 'result'
+            "result": result["result"],  # Ensure result contains prediction data
             "timestamp": datetime.utcnow()
         })
 
@@ -235,22 +233,17 @@ async def upload_report(file: UploadFile = File(...)):
 
 # GET /api/history — fetch user report history
 @app.get("/api/history")
-async def get_user_history():
+async def get_user_history(username: str = None):
     try:
-        # Fetch all health risk history records from MongoDB
-        entries = list(collection.find().sort("timestamp", -1))  # No filter, fetch all documents sorted by timestamp
+        query_filter = {}
+        if username:
+            query_filter["username"] = username
+
+        # Fetch user-specific health history records from MongoDB
+        entries = list(collection.find(query_filter).sort("timestamp", -1))  # Filtered by username and sorted by timestamp
+
         for entry in entries:
             entry["_id"] = str(entry["_id"])  # Convert MongoDB ObjectId to string for frontend usage
         return entries  # Return the list of health report entries
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": "Failed to fetch history", "detail": str(e)})
-
-
-# Ensure Uvicorn runs the FastAPI app without issues
-if __name__ == "__main__":
-    import uvicorn
-    import asyncio
-
-    loop = asyncio.get_event_loop()
-    loop.create_task(uvicorn.run(app, host="0.0.0.0", port=10000))
-    loop.run_forever()
