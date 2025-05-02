@@ -57,7 +57,6 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    // Hardcoded JWT secret key
     const token = jwt.sign({ username }, "sabaris_secret", { expiresIn: "1h" });
     console.log("✅ Login success");
 
