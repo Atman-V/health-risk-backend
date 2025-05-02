@@ -1,5 +1,3 @@
-import os
-import uvicorn
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,6 +9,8 @@ import joblib
 import numpy as np
 import shutil
 from upload import extract_health_data_from_pdf, predict_from_extracted_fields
+import uvicorn
+import asyncio
 
 # Load models and encoders
 model = joblib.load("model_xgboost.joblib")
@@ -240,14 +240,17 @@ async def get_user_history():
         # Fetch all health risk history records from MongoDB
         entries = list(collection.find().sort("timestamp", -1))  # No filter, fetch all documents sorted by timestamp
         for entry in entries:
-            entry["_id"] = str(entry["_id"])  # Convert MongoDB ObjectId to string
+            entry["_id"] = str(entry["_id"])  # Convert MongoDB ObjectId to string for frontend usage
         return entries  # Return the list of health report entries
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": "Failed to fetch history", "detail": str(e)})
 
-# Get the port from environment variables (for Render)
-import os
-import uvicorn
 
-port = int(os.getenv("PORT", 10000))  # Use Render's port or fallback to 10000
-uvicorn.run(app, host="0.0.0.0", port=port)
+# Ensure Uvicorn runs the FastAPI app without issues
+if __name__ == "__main__":
+    import uvicorn
+    import asyncio
+
+    loop = asyncio.get_event_loop()
+    loop.create_task(uvicorn.run(app, host="0.0.0.0", port=10000))
+    loop.run_forever()
