@@ -147,7 +147,7 @@ async def login(request: LoginRequest):
 
 # POST /api/survey — form submission (for risk analysis)
 @app.post("/api/survey")
-async def analyze_risk(data: SurveyData, token: str = Depends(oauth2_scheme)):
+async def analyze_risk(data: SurveyData):
     try:
         input_dict = data.dict()
         family = input_dict["familyHistory"].split(",")
