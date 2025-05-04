@@ -83,13 +83,14 @@ class SurveyData(BaseModel):
     diet: str
     weight: float
     stress: str
-    familyHistory: str
-    symptoms: str
+    familyHistory: list[str]  # Change from str to list of strings
+    symptoms: list[str]       # Change from str to list of strings
     bloodPressure: float
     sugarLevel: float
     cholesterol: float
     mentalHealth: str
     activityLevel: str
+
 
 # Generate Recommendations
 def generate_recommendations(predictions):
@@ -148,11 +149,14 @@ async def login(request: LoginRequest):
 # POST /api/survey — form submission (for risk analysis)
 @app.post("/api/survey")
 async def analyze_risk(data: SurveyData):
+
     try:
         input_dict = data.dict()
-        family = input_dict["familyHistory"].split(",")
-        symptoms = input_dict["symptoms"].split(",")
-        
+
+        # familyHistory and symptoms are already arrays, so no need to split them
+        family = input_dict["familyHistory"]
+        symptoms = input_dict["symptoms"]
+
         # Prepare input data for prediction
         feature_cols = [
             "age", "gender", "smoking", "alcohol", "exercise", "sleep",
@@ -195,6 +199,7 @@ async def analyze_risk(data: SurveyData):
     except Exception as e:
         print("🔥 SERVER ERROR:", e)
         return JSONResponse(status_code=500, content={"error": "Internal Server Error", "detail": str(e)})
+
 
 # POST /api/upload — PDF upload
 @app.post("/api/upload")
