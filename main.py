@@ -83,134 +83,58 @@ class SurveyData(BaseModel):
     diet: str
     weight: float
     stress: str
-    familyHistory: list[str]  # Correcting to list of strings
-    symptoms: list[str]       # Correcting to list of strings
+    familyHistory: list[str]
+    symptoms: list[str]
     bloodPressure: float
     sugarLevel: float
     cholesterol: float
     mentalHealth: str
     activityLevel: str
 
-
 # Generate Recommendations for health risks
-# Generate Recommendations for health risks based on specific survey combinations
-def generate_dynamic_recommendations(predictions, survey_data):
-    recs = []
-
-    # Heart Risk Recommendations based on survey combinations
-    if predictions["heartRisk"] == "High":
-        if survey_data["smoking"] == "yes":
-            recs.append("Consider quitting smoking to reduce your heart disease risk.")
-        if survey_data["age"] > 45:
-            recs.append("Due to your age, regular heart check-ups and ECG are recommended.")
-        if survey_data["bloodPressure"] > 140:
-            recs.append("High blood pressure detected. Consider reducing salt intake and taking prescribed medication.")
-    elif predictions["heartRisk"] == "Moderate":
-        if survey_data["exercise"] == "never":
-            recs.append("Starting moderate exercise like walking will help reduce heart risks.")
-        if survey_data["cholesterol"] > 240:
-            recs.append("Your cholesterol levels are slightly high. Avoid fried foods and increase fiber in your diet.")
-    else:
-        recs.append("Maintain a healthy lifestyle with regular exercise and a balanced diet to keep your heart healthy.")
-
-    # Diabetes Risk Recommendations based on survey combinations
-    if predictions["diabetesRisk"] == "High":
-        if survey_data["sugarLevel"] > 130:
-            recs.append("High sugar levels detected. Monitor your blood sugar regularly and consult a doctor.")
-        if survey_data["weight"] > 85:
-            recs.append("Your weight puts you at a higher risk. Consider a low-calorie, high-fiber diet and regular exercise.")
-        if "diabetes" in survey_data["familyHistory"]:
-            recs.append("Family history of diabetes. Regular blood sugar testing is recommended.")
-    elif predictions["diabetesRisk"] == "Moderate":
-        if survey_data["diet"] == "poor":
-            recs.append("Improving your diet by reducing processed foods and sugar can help control diabetes risk.")
-        if survey_data["exercise"] == "never":
-            recs.append("A daily walk or light exercise can significantly reduce your diabetes risk.")
-    else:
-        recs.append("Your diabetes risk is low, but continue maintaining a healthy diet and exercise routine.")
-
-    # Mental Health Risk Recommendations based on survey combinations
-    if predictions["mentalRisk"] == "High":
-        if survey_data["stress"] == "high":
-            recs.append("High stress levels detected. Consider practicing mindfulness, yoga, or seeking professional therapy.")
-        if survey_data["sleep"] == "<5":
-            recs.append("Insufficient sleep can affect your mental health. Aim for 7-8 hours of sleep per night.")
-    elif predictions["mentalRisk"] == "Moderate":
-        if survey_data["sleep"] == "5-7":
-            recs.append("Moderate sleep levels. Try to improve your rest quality to reduce stress.")
-    else:
-        recs.append("Your mental health risk is low. Keep up your current healthy lifestyle.")
-
-    # Obesity Risk Recommendations based on survey combinations
-    if predictions["obesityRisk"] == "High":
-        if survey_data["activityLevel"] == "low":
-            recs.append("A sedentary lifestyle can increase obesity risk. Try to increase your activity level with simple exercises.")
-        if survey_data["diet"] == "poor":
-            recs.append("Improving your diet by cutting back on processed foods and increasing fruits and vegetables can help.")
-    elif predictions["obesityRisk"] == "Moderate":
-        if survey_data["diet"] == "poor":
-            recs.append("Consider consulting a nutritionist to create a healthier diet plan.")
-        if survey_data["exercise"] == "never":
-            recs.append("Begin light exercise to help reduce obesity risk, such as walking or swimming.")
-    else:
-        recs.append("Maintain a balanced diet and regular exercise routine to prevent obesity.")
-
-    return recs
-
-# Example usage in the survey analysis endpoint
-@app.post("/api/survey")
-async def analyze_risk(data: SurveyData):
-    try:
-        input_dict = data.dict()
-        family = input_dict["familyHistory"]
-        symptoms = input_dict["symptoms"]
-        
-        # Feature preparation for prediction
-        feature_cols = [
-            "age", "gender", "smoking", "alcohol", "exercise", "sleep",
-            "diet", "weight", "stress", "bloodPressure", "sugarLevel",
-            "cholesterol", "mentalHealth", "activityLevel"
-        ]
-        
-        input_arr = []
-        for col in feature_cols:
-            val = input_dict[col]
-            if col in encoders:
-                val = encoders[col].transform([val])[0]
-            input_arr.append(val)
-        
-        fam_vec = mlb_family.transform([family])
-        sym_vec = mlb_symptoms.transform([symptoms])
-        
-        final_input = np.hstack([input_arr, fam_vec[0], sym_vec[0]]).reshape(1, -1)
-
-        # Model prediction
-        raw_preds = model.predict(final_input)[0]
-        
-        # Decode predictions
-        risks = {}
-        for idx, key in enumerate(["heartRisk", "diabetesRisk", "mentalRisk", "obesityRisk"]):
-            risks[key] = label_encoders[key].inverse_transform([raw_preds[idx]])[0]
-
-        # Generate dynamic recommendations based on survey data and risk predictions
-        recommendations = generate_dynamic_recommendations(risks, input_dict)
-        
-        result = {"data": input_dict, "result": {**risks, **recommendations}}
-
-        # Save to MongoDB
-        collection.insert_one({
-            "username": input_dict["username"],
-            "source": "survey",
-            "data": input_dict,
-            "result": result["result"],
-            "timestamp": datetime.utcnow()
-        })
-
-        return result
-
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": "Internal Server Error", "detail": str(e)})
-
+def generate_recommendations(predictions):
+    full_recs = {
+        "heart": {
+            "High": ["Recommendation: Consider quitting smoking to reduce heart disease risk.", 
+                     "Recommendation: Regular heart check-ups are recommended due to high risk.",
+                     "Recommendation: Engage in heart-healthy exercise, such as walking or swimming.",
+                     "Recommendation: Consider medications to help manage heart health, as advised by a healthcare provider."],
+            "Moderate": ["Recommendation: Start moderate exercise like walking to reduce heart risks.", 
+                         "Recommendation: Monitor your cholesterol and reduce fat intake.",
+                         "Recommendation: Focus on a diet rich in fruits, vegetables, and whole grains."],
+            "Low": ["Recommendation: Keep up with a healthy lifestyle and regular exercise."]
+        },
+        "diabetes": {
+            "High": ["Recommendation: Monitor your blood sugar levels regularly.",
+                     "Recommendation: Consider a low-carb, high-fiber diet to manage diabetes.",
+                     "Recommendation: Speak with a healthcare provider about managing insulin levels."],
+            "Moderate": ["Recommendation: Improve your diet by reducing sugar intake and increasing fiber.",
+                         "Recommendation: Engage in regular physical activity to help manage your blood sugar."],
+            "Low": ["Recommendation: Keep maintaining a healthy lifestyle to prevent diabetes."]
+        },
+        "mental": {
+            "High": ["Recommendation: Consider seeing a therapist to address mental health concerns.",
+                     "Recommendation: Practice stress-reduction techniques like mindfulness or meditation.",
+                     "Recommendation: Consider joining support groups for additional emotional support."],
+            "Moderate": ["Recommendation: Try to get more sleep and reduce stress levels to improve mental health.",
+                         "Recommendation: Regular physical activity can help reduce stress and improve mood."],
+            "Low": ["Recommendation: Continue managing your mental health with regular sleep and stress management."]
+        },
+        "obesity": {
+            "High": ["Recommendation: Begin a fitness regimen to improve overall health and reduce obesity risk.",
+                     "Recommendation: Follow a balanced diet with less processed food and more vegetables.",
+                     "Recommendation: Consider consulting a nutritionist or weight management specialist."],
+            "Moderate": ["Recommendation: Start incorporating exercise into your routine to avoid further weight gain.",
+                         "Recommendation: Focus on portion control and balanced meals."],
+            "Low": ["Recommendation: Maintain a healthy weight by continuing your current healthy lifestyle."]
+        }
+    }
+    
+    result = {}
+    for key in ["heart", "diabetes", "mental", "obesity"]:
+        level = predictions[f"{key}Risk"]
+        result[f"{key}Advice"] = full_recs[key].get(level, [])
+    return result
 
 # User Registration
 @app.post("/api/register")
@@ -235,6 +159,60 @@ async def login(request: LoginRequest):
     access_token = create_access_token(data={"sub": user["username"]})
     return {"access_token": access_token, "token_type": "bearer"}
 
+# POST /api/survey — form submission (for risk analysis)
+@app.post("/api/survey")
+async def analyze_risk(data: SurveyData):
+    try:
+        input_dict = data.dict()
+        
+        # familyHistory and symptoms are already arrays, so no need to split them
+        family = input_dict["familyHistory"]
+        symptoms = input_dict["symptoms"]
+
+        # Prepare input data for prediction
+        feature_cols = [
+            "age", "gender", "smoking", "alcohol", "exercise", "sleep",
+            "diet", "weight", "stress", "bloodPressure", "sugarLevel",
+            "cholesterol", "mentalHealth", "activityLevel"
+        ]
+        
+        input_arr = []
+        for col in feature_cols:
+            val = input_dict[col]
+            if col in encoders:
+                val = encoders[col].transform([val])[0]
+            input_arr.append(val)
+        
+        # Transform family history and symptoms
+        fam_vec = mlb_family.transform([family])
+        sym_vec = mlb_symptoms.transform([symptoms])
+        
+        final_input = np.hstack([input_arr, fam_vec[0], sym_vec[0]]).reshape(1, -1)
+
+        # Model prediction
+        raw_preds = model.predict(final_input)[0]
+        
+        risks = {}
+        for idx, key in enumerate(["heartRisk", "diabetesRisk", "mentalRisk", "obesityRisk"]):
+            risks[key] = label_encoders[key].inverse_transform([raw_preds[idx]])[0]
+
+        # Generate recommendations
+        advice = generate_recommendations(risks)
+        result = {"data": input_dict, "result": {**risks, **advice}}
+
+        # Save to MongoDB
+        collection.insert_one({
+            "username": input_dict["username"],
+            "source": "survey",
+            "data": input_dict,
+            "result": result["result"],
+            "timestamp": datetime.utcnow()
+        })
+
+        return result
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": "Internal Server Error", "detail": str(e)})
 
 # POST /api/upload — PDF upload
 @app.post("/api/upload")
@@ -263,7 +241,6 @@ async def upload_report(file: UploadFile = File(...)):
         return result
 
     except Exception as e:
-        print("🔥 UPLOAD ERROR:", e)
         return JSONResponse(status_code=500, content={"error": "Failed to process PDF", "detail": str(e)})
 
 # GET /api/history — fetch user report history
