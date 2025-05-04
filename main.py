@@ -149,13 +149,18 @@ async def login(request: LoginRequest):
 # POST /api/survey — form submission (for risk analysis)
 @app.post("/api/survey")
 async def analyze_risk(data: SurveyData):
-
     try:
         input_dict = data.dict()
+        
+        # Log the input data to check if it's being parsed correctly
+        print("Received input data:", input_dict)
 
         # familyHistory and symptoms are already arrays, so no need to split them
         family = input_dict["familyHistory"]
         symptoms = input_dict["symptoms"]
+        
+        print(f"Family History: {family}")
+        print(f"Symptoms: {symptoms}")
 
         # Prepare input data for prediction
         feature_cols = [
@@ -167,19 +172,28 @@ async def analyze_risk(data: SurveyData):
         input_arr = []
         for col in feature_cols:
             val = input_dict[col]
+            print(f"Processing {col}: {val}")
             if col in encoders:
                 val = encoders[col].transform([val])[0]
             input_arr.append(val)
         
+        # Transform family history and symptoms
         fam_vec = mlb_family.transform([family])
         sym_vec = mlb_symptoms.transform([symptoms])
+        
+        print(f"Family vector: {fam_vec}")
+        print(f"Symptoms vector: {sym_vec}")
+        
         final_input = np.hstack([input_arr, fam_vec[0], sym_vec[0]]).reshape(1, -1)
 
         # Model prediction
         raw_preds = model.predict(final_input)[0]
+        print(f"Raw predictions: {raw_preds}")
+        
         risks = {}
-        for key in ["heartRisk", "diabetesRisk", "mentalRisk", "obesityRisk"]:
-            risks[key] = label_encoders[key].inverse_transform([raw_preds[i]])[0]
+        for idx, key in enumerate(["heartRisk", "diabetesRisk", "mentalRisk", "obesityRisk"]):
+            risks[key] = label_encoders[key].inverse_transform([raw_preds[idx]])[0]
+            print(f"{key}: {risks[key]}")
 
         # Generate recommendations
         advice = generate_recommendations(risks)
@@ -199,6 +213,7 @@ async def analyze_risk(data: SurveyData):
     except Exception as e:
         print("🔥 SERVER ERROR:", e)
         return JSONResponse(status_code=500, content={"error": "Internal Server Error", "detail": str(e)})
+
 
 
 # POST /api/upload — PDF upload
