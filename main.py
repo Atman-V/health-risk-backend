@@ -27,10 +27,10 @@ db = client["healthrisk"]
 collection = db["surveys"]
 users_collection = db["users"]
 
-# Initialize app
+# Initialize FastAPI app
 app = FastAPI()
 
-# CORS for frontend communication
+# CORS setup to allow frontend communication
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,14 +40,14 @@ app.add_middleware(
 
 # Password hashing and JWT context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = "your-secret-key"  # Store securely in environment variables
+SECRET_KEY = "your-secret-key"  # Make sure to store securely in environment variables
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # OAuth2PasswordBearer to handle authorization headers
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 
-# Custom validation error handler
+# Custom validation error handler for request validation errors
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -55,7 +55,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors(), "body": exc.body},
     )
 
-# JWT helper function to create access token
+# Helper function to create JWT access tokens
 def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
     to_encode = data.copy()
     expire = datetime.utcnow() + expires_delta
@@ -63,7 +63,7 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# Pydantic input schemas for registration, login, and survey
+# Pydantic input schemas for registration, login, and survey data
 class RegisterRequest(BaseModel):
     username: str
     password: str
@@ -83,8 +83,8 @@ class SurveyData(BaseModel):
     diet: str
     weight: float
     stress: str
-    familyHistory: list[str]  # Change from str to list of strings
-    symptoms: list[str]       # Change from str to list of strings
+    familyHistory: list[str]  # Correcting to list of strings
+    symptoms: list[str]       # Correcting to list of strings
     bloodPressure: float
     sugarLevel: float
     cholesterol: float
@@ -92,7 +92,7 @@ class SurveyData(BaseModel):
     activityLevel: str
 
 
-# Generate Recommendations
+# Generate Recommendations for health risks
 def generate_recommendations(predictions):
     full_recs = {
         "heart": {
